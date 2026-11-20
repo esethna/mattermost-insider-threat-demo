@@ -8,23 +8,30 @@
         return m ? m[1] : '';
     }
 
+    // The server reports the outcome as an ephemeral post in the current channel; only failures
+    // that never reach it fall back to an alert.
     async function start(store) {
         const state = store.getState();
         const teamId = state.entities.teams.currentTeamId;
+        const channelId = state.entities.channels.currentChannelId;
         const base = (window.basename || '').replace(/\/$/, '');
-        let message;
+        let failure;
         try {
             const resp = await fetch(`${base}/plugins/${id}/start`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrfToken()},
-                body: JSON.stringify({team_id: teamId}),
+                body: JSON.stringify({team_id: teamId, channel_id: channelId}),
             });
-            message = resp.ok ? (await resp.json()).message : `The demo didn't start (${resp.status}).`;
+            if (!resp.ok) {
+                failure = resp.status === 401 ? 'Your session has expired. Reload the page and sign in again.' : `The demo didn't start (${resp.status}).`;
+            }
         } catch (e) {
-            message = "The demo didn't start: the server couldn't be reached.";
+            failure = "The demo didn't start: the server couldn't be reached.";
         }
-        window.alert(message);
+        if (failure) {
+            window.alert(failure);
+        }
     }
 
     class DemoPlugin {
