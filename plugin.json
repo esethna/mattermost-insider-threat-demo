@@ -1,0 +1,29 @@
+{
+  "id": "com.esethna.insider-threat-demo",
+  "name": "Insider Threat Demo",
+  "description": "Starts the Meridian SOC insider threat demo: runs an Elastic workflow that posts the alert and starts the playbook run through this plugin.",
+  "homepage_url": "https://github.com/esethna/mattermost-insider-threat-demo",
+  "support_url": "https://github.com/esethna/mattermost-insider-threat-demo/issues",
+  "version": "0.1.0",
+  "min_server_version": "10.0.0",
+  "server": {
+    "executables": {
+      "linux-amd64": "server/dist/plugin-linux-amd64",
+      "linux-arm64": "server/dist/plugin-linux-arm64",
+      "darwin-arm64": "server/dist/plugin-darwin-arm64"
+    }
+  },
+  "webapp": {
+    "bundle_path": "webapp/dist/main.js"
+  },
+  "settings_schema": {
+    "header": "The Elastic workflow calls back into this server with the callback secret. Both secrets are filled in at first boot on preview instances.",
+    "settings": [
+      {"key": "KibanaURL", "display_name": "Kibana URL", "type": "text", "help_text": "Base URL of the Kibana project that runs the workflow."},
+      {"key": "ElasticAPIKey", "display_name": "Elastic API key", "type": "text", "secret": true, "help_text": "API key allowed to run the workflow."},
+      {"key": "WorkflowID", "display_name": "Workflow ID", "type": "text", "default": "insider-threat-preview-start"},
+      {"key": "CallbackSecret", "display_name": "Callback secret", "type": "text", "secret": true, "help_text": "Shared with the workflow. At least 24 characters."},
+      {"key": "PreviewDomain", "display_name": "Preview domain", "type": "text", "default": "test.mattermost.cloud", "help_text": "This server's site URL must be <instance>.<domain>; the workflow only calls back to that domain."}
+    ]
+  }
+}

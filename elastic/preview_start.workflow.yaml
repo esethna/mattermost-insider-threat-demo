@@ -1,0 +1,159 @@
+name: Insider threat demo - start (preview)
+description: >-
+  Started by the Insider Threat Demo plugin on a Mattermost preview. Posts the Elastic alert into
+  #soc-alerts, starts the Insider Threat Response run from it and pins a link to the alert, all
+  through the plugin's callback API on https://<instance>.<domain>. Then deletes demo cases and
+  watch rules (tag mattermost-demo) older than cleanup_minutes (two hours), so concurrent demos are left alone.
+enabled: true
+tags: [mattermost, demo, insider-threat]
+consts:
+  rule: Large print job outside working hours
+  domain: __PREVIEW_DOMAIN__
+  plugin: /plugins/com.esethna.insider-threat-demo/api/v1
+  secret: __CALLBACK_SECRET__
+  demo_tag: mattermost-demo
+  cleanup_minutes: __CLEANUP_MINUTES__
+triggers:
+  - type: manual
+    inputs:
+      - name: instance
+        type: string
+        description: Preview instance name; the workflow only calls https://<instance>.<domain>
+      - name: team
+        type: string
+        default: meridian-soc
+      - name: analyst
+        type: string
+        description: Run owner, the user who pressed the button
+        default: priya.raman
+      - name: subject
+        type: string
+        default: e.marsh
+steps:
+  - name: preview
+    type: data.regexExtract
+    source: "{{ inputs.instance }}"
+    errorIfNoMatch: true
+    with:
+      pattern: "^([a-z0-9][a-z0-9-]{0,62})$"
+      fields:
+        name: "$1"
+
+  - name: alert
+    type: elasticsearch.search
+    with:
+      index: ".alerts-security.alerts-default"
+      size: 1
+      sort:
+        - "@timestamp": desc
+      query:
+        bool:
+          filter:
+            - term: { "kibana.alert.rule.name": "{{ consts.rule }}" }
+            - term: { "user.name": "{{ inputs.subject }}" }
+
+  - name: post_alert
+    type: http
+    with:
+      url: "https://{{ steps.preview.output.name }}.{{ consts.domain }}"
+      path: "{{ consts.plugin }}/alert"
+      method: POST
+      headers:
+        Authorization: "Bearer {{ consts.secret }}"
+      body:
+        team: "{{ inputs.team }}"
+        channel: soc-alerts
+        priority: urgent
+        attachment:
+          color: "#D24B4E"
+          title: "{{ consts.rule }}"
+          title_link: "{{ steps.alert.output.hits.hits[0]._source['kibana.alert.url'] }}"
+          text: "Detected {{ steps.alert.output.hits.hits[0]._source['kibana.alert.original_time'] | date: '%Y-%m-%d %H:%M', 360 }} facility time"
+          footer: Elastic Security
+          fields:
+            - { title: Severity, value: "{{ steps.alert.output.hits.hits[0]._source['kibana.alert.severity'] }}", short: true }
+            - { title: Risk score, value: "{{ steps.alert.output.hits.hits[0]._source['kibana.alert.risk_score'] }}", short: true }
+            - { title: User, value: "{{ steps.alert.output.hits.hits[0]._source['user.full_name'] }} ({{ inputs.subject }})", short: true }
+            - { title: Host, value: "{{ steps.alert.output.hits.hits[0]._source['host.name'] }}", short: true }
+            - { title: Printer, value: "{{ steps.alert.output.hits.hits[0]._source['print.printer'] }}", short: true }
+            - { title: Pages, value: "{{ steps.alert.output.hits.hits[0]._source['print.pages'] }}", short: true }
+            - { title: File, value: "{{ steps.alert.output.hits.hits[0]._source['file.name'] }}", short: false }
+            - { title: Marking, value: "{{ steps.alert.output.hits.hits[0]._source['classification.marking'] }}", short: true }
+            - { title: Print job, value: "{{ steps.alert.output.hits.hits[0]._source['print.job_id'] }}", short: true }
+
+  - name: start_run
+    type: http
+    with:
+      url: "https://{{ steps.preview.output.name }}.{{ consts.domain }}"
+      path: "{{ consts.plugin }}/run"
+      method: POST
+      headers:
+        Authorization: "Bearer {{ consts.secret }}"
+      body:
+        team: "{{ inputs.team }}"
+        playbook: Insider Threat Response
+        owner: "{{ inputs.analyst }}"
+        post_id: "{{ steps.post_alert.output.data.post_id }}"
+        name: "Insider threat review: {{ inputs.subject }} large print after hours"
+        properties:
+          Subject: "{{ steps.alert.output.hits.hits[0]._source['user.full_name'] }} ({{ inputs.subject }})"
+          Alert source: Elastic Security
+        summary: |-
+          $USER={{ inputs.subject }}
+          $HOST={{ steps.alert.output.hits.hits[0]._source['host.name'] }}
+
+          **Elastic alert:** {{ consts.rule }} ({{ steps.alert.output.hits.hits[0]._source['kibana.alert.severity'] }}, risk {{ steps.alert.output.hits.hits[0]._source['kibana.alert.risk_score'] }})
+          **Subject:** {{ steps.alert.output.hits.hits[0]._source['user.full_name'] }} ({{ inputs.subject }}), contractor, Halvorsen Systems
+          **Event:** {{ steps.alert.output.hits.hits[0]._source['print.pages'] }} pages of {{ steps.alert.output.hits.hits[0]._source['file.name'] }} ({{ steps.alert.output.hits.hits[0]._source['classification.marking'] }}) on {{ steps.alert.output.hits.hits[0]._source['print.printer'] }} at {{ steps.alert.output.hits.hits[0]._source['kibana.alert.original_time'] | date: '%H:%M', 360 }} facility time
+
+  - name: link_alert
+    type: http
+    with:
+      url: "https://{{ steps.preview.output.name }}.{{ consts.domain }}"
+      path: "{{ consts.plugin }}/message"
+      method: POST
+      headers:
+        Authorization: "Bearer {{ consts.secret }}"
+      body:
+        channel_id: "{{ steps.start_run.output.data.channel_id }}"
+        pin: true
+        message: "Original alert from ~soc-alerts:\nhttps://{{ steps.preview.output.name }}.{{ consts.domain }}/{{ inputs.team }}/pl/{{ steps.post_alert.output.data.post_id }}"
+
+  - name: old_cases
+    type: kibana.request
+    on-failure:
+      continue: true
+    with:
+      method: GET
+      path: /api/cases/_find
+      query: { owner: securitySolution, tags: "{{ consts.demo_tag }}", to: "now-{{ consts.cleanup_minutes }}m", perPage: 100 }
+
+  - name: delete_old_cases
+    type: if
+    condition: "steps.old_cases.output.total > 0"
+    steps:
+      - name: delete_cases
+        type: kibana.request
+        on-failure:
+          continue: true
+        with:
+          method: DELETE
+          path: /api/cases
+          query:
+            ids: "{{ steps.old_cases.output.cases | map: 'id' | json }}"
+
+  - name: delete_old_watch_rules
+    type: kibana.request
+    on-failure:
+      continue: true
+    with:
+      method: POST
+      path: /api/detection_engine/rules/_bulk_action
+      body:
+        action: delete
+        query: "{% assign age = consts.cleanup_minutes | times: 60 %}{% assign cutoff = 'now' | date: '%s' | minus: age | date: '%Y-%m-%dT%H:%M:%SZ', 0 %}alert.attributes.tags: \"{{ consts.demo_tag }}\" AND alert.attributes.createdAt < \"{{ cutoff }}\""
+
+  - name: done
+    type: console
+    with:
+      message: "Run started: {{ steps.start_run.output.data.name }} on {{ steps.preview.output.name }}.{{ consts.domain }}"
