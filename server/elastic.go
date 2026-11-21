@@ -11,42 +11,50 @@ import (
 
 var httpClient = &http.Client{Timeout: 20 * time.Second}
 
-// start runs the Elastic workflow, which calls back into this plugin to post the alert and
-// start the run. It returns a message for the user who asked.
-func (p *Plugin) start(userID, teamID string) string {
+// start runs the Elastic workflow in the background; the workflow calls back into this plugin
+// to post the alert and start the run. notify tells the user what happened, and may be called
+// again later if Elastic refuses the run.
+func (p *Plugin) start(userID, teamID string, notify func(string)) {
 	cfg := p.getConfig()
 	if cfg.KibanaURL == "" || cfg.ElasticAPIKey == "" || len(cfg.CallbackSecret) < 24 {
-		return "The demo isn't configured: Kibana URL, Elastic API key and callback secret are required."
+		notify("The demo isn't configured: Kibana URL, Elastic API key and callback secret are required.")
+		return
 	}
 	instance, err := p.instance(cfg.PreviewDomain)
 	if err != nil {
-		return "The demo can't start here: " + err.Error()
+		notify("The demo can't start here: " + err.Error())
+		return
 	}
 	team, appErr := p.API.GetTeam(teamID)
 	if appErr != nil {
-		return "Open the demo team first, then try again."
+		notify("Open the demo team first, then try again.")
+		return
 	}
 	user, appErr := p.API.GetUser(userID)
 	if appErr != nil {
-		return "Couldn't look up your account."
+		notify("Couldn't look up your account.")
+		return
 	}
 
 	p.mu.Lock()
 	if time.Since(p.lastStart) < 30*time.Second {
 		p.mu.Unlock()
-		return "The demo is already starting. Watch ~soc-alerts."
+		notify("The demo is already starting. Watch ~soc-alerts.")
+		return
 	}
 	p.lastStart = time.Now()
 	p.mu.Unlock()
 
-	if err := runWorkflow(cfg, map[string]string{"instance": instance, "team": team.Name, "analyst": user.Username}); err != nil {
-		p.mu.Lock()
-		p.lastStart = time.Time{}
-		p.mu.Unlock()
-		p.API.LogError("start demo workflow", "error", err.Error())
-		return "Elastic didn't start the workflow. Try again in a moment."
-	}
-	return "Starting the insider threat demo. The Elastic alert will appear in ~soc-alerts in a few seconds."
+	notify("Starting the insider threat demo. The Elastic alert will appear in ~soc-alerts in a few seconds.")
+	go func() {
+		if err := runWorkflow(cfg, map[string]string{"instance": instance, "team": team.Name, "analyst": user.Username}); err != nil {
+			p.mu.Lock()
+			p.lastStart = time.Time{}
+			p.mu.Unlock()
+			p.API.LogError("start demo workflow", "error", err.Error())
+			notify("Elastic didn't start the workflow. Try again in a moment.")
+		}
+	}()
 }
 
 func runWorkflow(cfg configuration, inputs map[string]string) error {

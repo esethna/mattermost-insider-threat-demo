@@ -4,7 +4,7 @@
   "description": "Starts the Meridian SOC insider threat demo: runs an Elastic workflow that posts the alert and starts the playbook run through this plugin.",
   "homepage_url": "https://github.com/esethna/mattermost-insider-threat-demo",
   "support_url": "https://github.com/esethna/mattermost-insider-threat-demo/issues",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "min_server_version": "10.0.0",
   "server": {
     "executables": {

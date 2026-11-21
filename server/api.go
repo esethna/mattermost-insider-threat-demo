@@ -52,14 +52,22 @@ func (p *Plugin) handleStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not on this team", http.StatusForbidden)
 		return
 	}
-	msg := p.start(userID, in.TeamID)
-	p.API.LogInfo("demo start requested", "user_id", userID, "result", msg)
+	inChannel := false
 	if in.ChannelID != "" {
-		if _, appErr := p.API.GetChannelMember(in.ChannelID, userID); appErr == nil {
+		_, appErr := p.API.GetChannelMember(in.ChannelID, userID)
+		inChannel = appErr == nil
+	}
+	var first string
+	p.start(userID, in.TeamID, func(msg string) {
+		if first == "" {
+			first = msg
+		}
+		p.API.LogInfo("demo start", "user_id", userID, "result", msg)
+		if inChannel {
 			p.API.SendEphemeralPost(userID, &model.Post{UserId: p.botID, ChannelId: in.ChannelID, Message: msg})
 		}
-	}
-	writeJSON(w, map[string]string{"message": msg})
+	})
+	writeJSON(w, map[string]string{"message": first})
 }
 
 // callback checks the shared secret the Elastic workflow sends, then decodes the JSON body.

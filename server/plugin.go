@@ -116,7 +116,15 @@ func (p *Plugin) ExecuteCommand(_ *plugin.Context, args *model.CommandArgs) (*mo
 	if len(fields) < 2 || fields[1] != "start" {
 		return ephemeral("Usage: `/demo start`"), nil
 	}
-	return ephemeral(p.start(args.UserId, args.TeamId)), nil
+	var first string
+	p.start(args.UserId, args.TeamId, func(msg string) {
+		if first == "" {
+			first = msg
+			return
+		}
+		p.API.SendEphemeralPost(args.UserId, &model.Post{UserId: p.botID, ChannelId: args.ChannelId, Message: msg})
+	})
+	return ephemeral(first), nil
 }
 
 func ephemeral(text string) *model.CommandResponse {
