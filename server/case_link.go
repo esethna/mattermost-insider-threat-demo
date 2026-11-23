@@ -19,6 +19,7 @@ func (p *Plugin) MessageHasBeenPosted(_ *plugin.Context, post *model.Post) {
 // MessageHasBeenUpdated is needed because agent replies stream in as edits to an initially empty post.
 func (p *Plugin) MessageHasBeenUpdated(_ *plugin.Context, post, _ *model.Post) {
 	p.recordCaseLink(post)
+	p.recordCall(post)
 }
 
 // recordCaseLink copies the first Elastic case link an agent posts in a demo run channel into the
