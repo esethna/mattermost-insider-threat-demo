@@ -1,7 +1,7 @@
 name: Insider threat demo - start (preview)
 description: >-
   Started by the Insider Threat Demo plugin on a Mattermost preview. Posts the Elastic alert into
-  #soc-alerts, starts the Insider Threat Response run from it and pins a link to the alert, all
+  #soc-alerts, starts the DLP Response run from it, pins an urgent link to the alert for the analyst to acknowledge, all
   through the plugin's callback API on https://<instance>.<domain>. Then deletes demo cases and
   watch rules (tag mattermost-demo) older than cleanup_minutes (two hours), so concurrent demos are left alone.
 enabled: true
@@ -91,10 +91,10 @@ steps:
         Authorization: "Bearer {{ consts.secret }}"
       body:
         team: "{{ inputs.team }}"
-        playbook: Insider Threat Response
+        playbook: DLP Response
         owner: "{{ inputs.analyst }}"
         post_id: "{{ steps.post_alert.output.data.post_id }}"
-        name: "Insider threat review: {{ inputs.subject }} large print after hours"
+        name: "DLP: {{ inputs.subject }} large print after hours"
         properties:
           Subject: "{{ steps.alert.output.hits.hits[0]._source['user.full_name'] }} ({{ inputs.subject }})"
           Alert source: Elastic Security
@@ -117,7 +117,10 @@ steps:
       body:
         channel_id: "{{ steps.start_run.output.data.channel_id }}"
         pin: true
-        message: "Original alert from ~soc-alerts:\nhttps://{{ steps.preview.output.name }}.{{ consts.domain }}/{{ inputs.team }}/pl/{{ steps.post_alert.output.data.post_id }}"
+        priority: urgent
+        ack: true
+        persistent: true
+        message: "@{{ inputs.analyst }} please acknowledge. Original alert from ~soc-alerts:\nhttps://{{ steps.preview.output.name }}.{{ consts.domain }}/{{ inputs.team }}/pl/{{ steps.post_alert.output.data.post_id }}"
 
   - name: old_cases
     type: kibana.request

@@ -147,7 +147,8 @@ func (p *Plugin) handleRun(body json.RawMessage) (any, error) {
 	if _, appErr := p.API.GetTeamMember(team.Id, owner.Id); appErr != nil {
 		return nil, fmt.Errorf("owner %s isn't on team %s", in.Owner, in.Team)
 	}
-	if post, appErr := p.API.GetPost(in.PostID); appErr != nil || post.UserId != p.botID {
+	alert, appErr := p.API.GetPost(in.PostID)
+	if appErr != nil || alert.UserId != p.botID {
 		return nil, fmt.Errorf("post %s isn't an alert from this plugin", in.PostID)
 	}
 
@@ -201,6 +202,15 @@ func (p *Plugin) handleRun(body json.RawMessage) (any, error) {
 			}
 		}
 	}
+	reply := &model.Post{
+		UserId:    p.botID,
+		ChannelId: alert.ChannelId,
+		RootId:    alert.Id,
+		Message:   fmt.Sprintf("%s started [%s](/playbooks/runs/%s) from this alert.", owner.GetDisplayName(model.ShowFullName), run.Name, run.ID),
+	}
+	if _, appErr := p.API.CreatePost(reply); appErr != nil {
+		p.API.LogWarn("reply on alert", "error", appErr.Error())
+	}
 	return map[string]string{"run_id": run.ID, "channel_id": run.ChannelID, "name": run.Name}, nil
 }
 
@@ -209,6 +219,10 @@ func (p *Plugin) handleMessage(body json.RawMessage) (any, error) {
 		ChannelID string `json:"channel_id"`
 		Message   string `json:"message"`
 		Pin       bool   `json:"pin"`
+		// Persistent notifications need urgent priority and an @mention in the message.
+		Priority   string `json:"priority"`
+		Ack        bool   `json:"ack"`
+		Persistent bool   `json:"persistent"`
 	}
 	if err := json.Unmarshal(body, &in); err != nil {
 		return nil, err
@@ -217,7 +231,15 @@ func (p *Plugin) handleMessage(body json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("channel %s isn't a run this plugin started", in.ChannelID)
 	}
 	p.ensureMember(in.ChannelID)
-	created, appErr := p.API.CreatePost(&model.Post{UserId: p.botID, ChannelId: in.ChannelID, Message: in.Message, IsPinned: in.Pin})
+	post := &model.Post{UserId: p.botID, ChannelId: in.ChannelID, Message: in.Message, IsPinned: in.Pin}
+	if in.Priority != "" || in.Ack || in.Persistent {
+		post.Metadata = &model.PostMetadata{Priority: &model.PostPriority{
+			Priority:                model.NewPointer(in.Priority),
+			RequestedAck:            model.NewPointer(in.Ack),
+			PersistentNotifications: model.NewPointer(in.Persistent),
+		}}
+	}
+	created, appErr := p.API.CreatePost(post)
 	if appErr != nil {
 		return nil, fmt.Errorf("post message: %s", appErr.Message)
 	}
