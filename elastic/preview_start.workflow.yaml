@@ -1,7 +1,7 @@
 name: Insider threat demo - start (preview)
 description: >-
   Started by the Insider Threat Demo plugin on a Mattermost preview. Posts the Elastic alert into
-  #soc-alerts, starts the DLP Response run from it, pins an urgent link to the alert for the analyst to acknowledge, all
+  #soc-alerts, waits a few seconds, starts the DLP Response run from it and posts an urgent link to the alert for the analyst to acknowledge, all
   through the plugin's callback API on https://<instance>.<domain>. Then deletes demo cases and
   watch rules (tag mattermost-demo) older than cleanup_minutes (two hours), so concurrent demos are left alone.
 enabled: true
@@ -80,6 +80,11 @@ steps:
             - { title: Marking, value: "{{ steps.alert.output.hits.hits[0]._source['classification.marking'] }}", short: true }
             - { title: Print job, value: "{{ steps.alert.output.hits.hits[0]._source['print.job_id'] }}", short: true }
 
+  - name: pause
+    type: wait
+    with:
+      duration: 5s
+
   - name: start_run
     type: http
     with:
@@ -115,7 +120,6 @@ steps:
         Authorization: "Bearer {{ consts.secret }}"
       body:
         channel_id: "{{ steps.start_run.output.data.channel_id }}"
-        pin: true
         priority: urgent
         ack: true
         persistent: true
