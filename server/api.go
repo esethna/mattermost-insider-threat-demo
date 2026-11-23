@@ -206,7 +206,7 @@ func (p *Plugin) handleRun(body json.RawMessage) (any, error) {
 		UserId:    p.botID,
 		ChannelId: alert.ChannelId,
 		RootId:    alert.Id,
-		Message:   fmt.Sprintf("%s started [%s](/playbooks/runs/%s) from this alert.", owner.GetDisplayName(model.ShowFullName), run.Name, run.ID),
+		Message:   fmt.Sprintf("Triggered response Playbook [%s](/playbooks/runs/%s) from this alert.", run.Name, run.ID),
 	}
 	if _, appErr := p.API.CreatePost(reply); appErr != nil {
 		p.API.LogWarn("reply on alert", "error", appErr.Error())

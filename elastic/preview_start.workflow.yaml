@@ -63,7 +63,6 @@ steps:
       body:
         team: "{{ inputs.team }}"
         channel: soc-alerts
-        priority: urgent
         attachment:
           color: "#D24B4E"
           title: "{{ consts.rule }}"

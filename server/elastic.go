@@ -45,7 +45,7 @@ func (p *Plugin) start(userID, teamID string, notify func(string)) {
 	p.lastStart = time.Now()
 	p.mu.Unlock()
 
-	notify("Starting the demo. A simulated Elastic Security alert will appear in ~soc-alerts in a few seconds.")
+	notify("A simulated Elastic Security alert will appear in ~soc-alerts in a few seconds.")
 	go func() {
 		if err := runWorkflow(cfg, map[string]string{"instance": instance, "team": team.Name, "analyst": user.Username}); err != nil {
 			p.mu.Lock()
