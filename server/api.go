@@ -29,6 +29,8 @@ func (p *Plugin) ServeHTTP(_ *plugin.Context, w http.ResponseWriter, r *http.Req
 		p.callback(w, r, p.handleRun)
 	case "/api/v1/message":
 		p.callback(w, r, p.handleMessage)
+	case "/soar/action":
+		p.handleSoarAction(w, r)
 	default:
 		http.NotFound(w, r)
 	}
@@ -109,7 +111,7 @@ func (p *Plugin) handleAlert(body json.RawMessage) (any, error) {
 	if appErr != nil {
 		return nil, fmt.Errorf("channel %s/%s: %s", in.Team, in.Channel, appErr.Message)
 	}
-	p.ensureMember(ch.Id)
+	p.ensureMember(ch.Id, p.botID)
 	post := &model.Post{UserId: p.botID, ChannelId: ch.Id}
 	post.AddProp(model.PostPropsAttachments, []any{in.Attachment})
 	if in.Priority != "" {
@@ -187,6 +189,9 @@ func (p *Plugin) handleRun(body json.RawMessage) (any, error) {
 	if appErr := p.API.KVSet("run_channel_"+run.ChannelID, []byte(run.ID)); appErr != nil {
 		return nil, fmt.Errorf("remember run channel: %s", appErr.Message)
 	}
+	if appErr := p.API.KVSet("run_owner_"+run.ID, []byte(owner.Id)); appErr != nil {
+		return nil, fmt.Errorf("remember run owner: %s", appErr.Message)
+	}
 
 	var fields []struct {
 		ID   string `json:"id"`
@@ -230,7 +235,7 @@ func (p *Plugin) handleMessage(body json.RawMessage) (any, error) {
 	if v, appErr := p.API.KVGet("run_channel_" + in.ChannelID); appErr != nil || v == nil {
 		return nil, fmt.Errorf("channel %s isn't a run this plugin started", in.ChannelID)
 	}
-	p.ensureMember(in.ChannelID)
+	p.ensureMember(in.ChannelID, p.botID)
 	post := &model.Post{UserId: p.botID, ChannelId: in.ChannelID, Message: in.Message, IsPinned: in.Pin}
 	if in.Priority != "" || in.Ack || in.Persistent {
 		post.Metadata = &model.PostMetadata{Priority: &model.PostPriority{
@@ -246,9 +251,9 @@ func (p *Plugin) handleMessage(body json.RawMessage) (any, error) {
 	return map[string]string{"post_id": created.Id}, nil
 }
 
-func (p *Plugin) ensureMember(channelID string) {
-	if _, appErr := p.API.GetChannelMember(channelID, p.botID); appErr != nil {
-		if _, appErr := p.API.AddChannelMember(channelID, p.botID); appErr != nil {
+func (p *Plugin) ensureMember(channelID, botID string) {
+	if _, appErr := p.API.GetChannelMember(channelID, botID); appErr != nil {
+		if _, appErr := p.API.AddChannelMember(channelID, botID); appErr != nil {
 			p.API.LogWarn("add bot to channel", "channel", channelID, "error", appErr.Error())
 		}
 	}

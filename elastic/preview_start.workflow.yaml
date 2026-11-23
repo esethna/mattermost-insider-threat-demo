@@ -105,8 +105,9 @@ steps:
         summary: |-
           $USER={{ inputs.subject }}
           $HOST={{ steps.alert.output.hits.hits[0]._source['host.name'] }}
+          $ALERT={{ consts.rule }}
 
-          **Elastic alert:** {{ consts.rule }} ({{ steps.alert.output.hits.hits[0]._source['kibana.alert.severity'] }}, risk {{ steps.alert.output.hits.hits[0]._source['kibana.alert.risk_score'] }})
+          **Severity:** {{ steps.alert.output.hits.hits[0]._source['kibana.alert.severity'] }}, risk {{ steps.alert.output.hits.hits[0]._source['kibana.alert.risk_score'] }}
           **Subject:** {{ steps.alert.output.hits.hits[0]._source['user.full_name'] }} ({{ inputs.subject }}), contractor, Halvorsen Systems
           **Event:** {{ steps.alert.output.hits.hits[0]._source['print.pages'] }} pages of {{ steps.alert.output.hits.hits[0]._source['file.name'] }} ({{ steps.alert.output.hits.hits[0]._source['classification.marking'] }}) on {{ steps.alert.output.hits.hits[0]._source['print.printer'] }} at {{ steps.alert.output.hits.hits[0]._source['kibana.alert.original_time'] | date: '%H:%M', 360 }} facility time
 

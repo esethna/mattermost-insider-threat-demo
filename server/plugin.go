@@ -29,6 +29,7 @@ type Plugin struct {
 	mu        sync.RWMutex
 	config    configuration
 	botID     string
+	soarID    string
 	lastStart time.Time
 }
 
@@ -62,13 +63,36 @@ func (p *Plugin) OnActivate() error {
 		return err
 	}
 	p.botID = botID
-	return p.API.RegisterCommand(&model.Command{
+	if p.soarID, err = p.ensureSoarBot(); err != nil {
+		return err
+	}
+	if err := p.API.RegisterCommand(&model.Command{
 		Trigger:          "demo",
 		DisplayName:      "Insider threat demo",
 		Description:      "Start the insider threat demo",
 		AutoComplete:     true,
 		AutoCompleteDesc: "Start the insider threat demo from the Elastic alert",
 		AutoCompleteHint: "start",
+	}); err != nil {
+		return err
+	}
+	if err := p.API.RegisterCommand(&model.Command{
+		Trigger:          "soar",
+		DisplayName:      "SOAR",
+		Description:      "Run a SOAR response action",
+		AutoComplete:     true,
+		AutoCompleteDesc: "Run a SOAR response action on a user and host",
+		AutoCompleteHint: "restrict|collect <user> <host>",
+	}); err != nil {
+		return err
+	}
+	return p.API.RegisterCommand(&model.Command{
+		Trigger:          "cohere",
+		DisplayName:      "Cohere North",
+		Description:      "Ask Cohere North and post its answer in the channel",
+		AutoComplete:     true,
+		AutoCompleteDesc: "Ask Cohere North, using this channel as context, and post the answer here",
+		AutoCompleteHint: "<request>",
 	})
 }
 
@@ -113,6 +137,12 @@ func (p *Plugin) instance(domain string) (string, error) {
 
 func (p *Plugin) ExecuteCommand(_ *plugin.Context, args *model.CommandArgs) (*model.CommandResponse, *model.AppError) {
 	fields := strings.Fields(args.Command)
+	if len(fields) > 0 && fields[0] == "/soar" {
+		return p.executeSoar(args), nil
+	}
+	if len(fields) > 0 && fields[0] == "/cohere" {
+		return p.executeCohere(args), nil
+	}
 	if len(fields) < 2 || fields[1] != "start" {
 		return ephemeral("Usage: `/demo start`"), nil
 	}
