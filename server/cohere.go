@@ -96,7 +96,7 @@ func (p *Plugin) complete(agentID, userID, channelID, transcript, prompt string)
 		"user_id":    userID,
 		"channel_id": channelID,
 		"posts": []map[string]string{
-			{"role": "system", "message": "You are posting a new top-level message in this incident channel for everyone in it, requested by @" + p.username(userID) + ". Don't address, greet or sign the message. Everything said in the channel so far, oldest first:\n\n" + transcript},
+			{"role": "system", "message": "You are posting a new top-level message in this incident channel for everyone in it, requested by @" + p.username(userID) + ". Don't address the requester, greet or sign the message. @mention people only when the request asks you to. Everything said in the channel so far, oldest first:\n\n" + transcript},
 			{"role": "user", "message": prompt},
 		},
 	})
