@@ -31,6 +31,7 @@ type Plugin struct {
 	botID     string
 	soarID    string
 	lastStart time.Time
+	stop      chan struct{}
 }
 
 func (p *Plugin) getConfig() configuration {
@@ -86,14 +87,26 @@ func (p *Plugin) OnActivate() error {
 	}); err != nil {
 		return err
 	}
-	return p.API.RegisterCommand(&model.Command{
+	if err := p.API.RegisterCommand(&model.Command{
 		Trigger:          "cohere",
 		DisplayName:      "Cohere North",
 		Description:      "Ask Cohere North and post its answer in the channel",
 		AutoComplete:     true,
 		AutoCompleteDesc: "Ask Cohere North, using this channel as context, and post the answer here",
 		AutoCompleteHint: "<request>",
-	})
+	}); err != nil {
+		return err
+	}
+	p.stop = make(chan struct{})
+	go p.watchRuns(p.stop)
+	return nil
+}
+
+func (p *Plugin) OnDeactivate() error {
+	if p.stop != nil {
+		close(p.stop)
+	}
+	return nil
 }
 
 // ensureBot reuses a dataset's elastic-security bot so seeded alerts and new ones share an author.
