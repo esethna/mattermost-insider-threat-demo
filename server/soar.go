@@ -143,6 +143,8 @@ func (p *Plugin) executeSoar(args *model.CommandArgs) *model.CommandResponse {
 		return ephemeral("SOAR couldn't post here: " + appErr.Message)
 	}
 
+	go p.completeStep(args.ChannelId, args.UserId, "/soar "+kind)
+
 	requester := p.username(args.UserId)
 	go func() {
 		time.Sleep(2 * time.Second)
