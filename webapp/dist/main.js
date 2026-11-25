@@ -1,7 +1,7 @@
 // Hand-written plugin bundle: no build step. Uses the React instance the Mattermost webapp exposes.
 (function () {
     const id = 'com.esethna.insider-threat-demo';
-    const label = 'Start insider threat demo';
+    const label = 'Simulate Elastic Security alert';
 
     function csrfToken() {
         const m = document.cookie.match(/(?:^|;\s*)MMCSRF=([^;]+)/);
