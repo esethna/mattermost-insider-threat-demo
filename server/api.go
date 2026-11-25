@@ -207,11 +207,15 @@ func (p *Plugin) handleRun(body json.RawMessage) (any, error) {
 			}
 		}
 	}
+	link := "/playbooks/runs/" + run.ID
+	if ch, appErr := p.API.GetChannel(run.ChannelID); appErr == nil {
+		link = "/" + team.Name + "/channels/" + ch.Name
+	}
 	reply := &model.Post{
 		UserId:    p.botID,
 		ChannelId: alert.ChannelId,
 		RootId:    alert.Id,
-		Message:   fmt.Sprintf("Triggered response Playbook [%s](/playbooks/runs/%s) from this alert.", run.Name, run.ID),
+		Message:   fmt.Sprintf("Triggered response Playbook [%s](%s) from this alert.", run.Name, link),
 	}
 	if _, appErr := p.API.CreatePost(reply); appErr != nil {
 		p.API.LogWarn("reply on alert", "error", appErr.Error())
