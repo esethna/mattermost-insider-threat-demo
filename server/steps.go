@@ -34,6 +34,8 @@ func stepKind(command string) string {
 		return ""
 	case f[0] == "/soar" && len(f) > 1:
 		return "/soar " + f[1]
+	case f[0] == "/echo" && strings.Contains(command, "status update"):
+		return statusUpdateKind
 	case f[0] == "/echo" || f[0] == "/cohere" || f[0] == "/soar" || f[0] == "/call":
 		return f[0]
 	}
@@ -56,9 +58,21 @@ func (p *Plugin) stepDoneAt(channelID, kind string) int64 {
 	return p.doneAt[channelID+"|"+kind]
 }
 
+// A step asking the agent to draft the run's status update is done once the update is posted.
+const (
+	statusUpdateKind     = "status update"
+	statusUpdatePostType = "custom_run_update"
+)
+
 // noteAgentAnswer treats an agent's answer posted at the top of a demo run channel, or a thread
 // reply from a bot linking to it, as the end of an /echo step.
 func (p *Plugin) noteAgentAnswer(post *model.Post) {
+	if post.Type == statusUpdatePostType {
+		if runID, appErr := p.API.KVGet("run_channel_" + post.ChannelId); appErr == nil && runID != nil {
+			p.stepDone(post.ChannelId, statusUpdateKind)
+		}
+		return
+	}
 	posted := post.RootId == "" && post.GetProp("ai_generated_by") != nil
 	linked := post.RootId != "" && strings.Contains(post.Message, "http")
 	if !posted && !linked {
