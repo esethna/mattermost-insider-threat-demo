@@ -174,6 +174,7 @@ func (p *Plugin) executeSoar(args *model.CommandArgs) *model.CommandResponse {
 		if _, appErr := p.API.UpdatePost(post); appErr != nil {
 			p.API.LogWarn("soar result", "error", appErr.Error())
 		}
+		p.stepDone(args.ChannelId, "/soar "+kind)
 	}()
 	return &model.CommandResponse{}
 }

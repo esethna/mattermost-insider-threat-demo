@@ -32,6 +32,7 @@ func (p *Plugin) recordCall(post *model.Post) {
 	if runID, appErr := p.API.KVGet("run_channel_" + post.ChannelId); appErr != nil || runID == nil {
 		return
 	}
+	p.stepDone(post.ChannelId, "/call")
 	if ok, appErr := p.API.KVCompareAndSet("call_recorded_"+post.Id, nil, []byte("1")); appErr != nil || !ok {
 		return
 	}

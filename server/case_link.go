@@ -14,11 +14,13 @@ var caseLinkRe = regexp.MustCompile(`https://[^\s()<>\[\]]+/app/security/cases/[
 
 func (p *Plugin) MessageHasBeenPosted(_ *plugin.Context, post *model.Post) {
 	p.recordCaseLink(post)
+	p.noteAgentAnswer(post)
 }
 
 // MessageHasBeenUpdated is needed because agent replies stream in as edits to an initially empty post.
 func (p *Plugin) MessageHasBeenUpdated(_ *plugin.Context, post, _ *model.Post) {
 	p.recordCaseLink(post)
+	p.noteAgentAnswer(post)
 	p.recordCall(post)
 }
 

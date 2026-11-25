@@ -32,6 +32,7 @@ type Plugin struct {
 	soarID    string
 	lastStart time.Time
 	stop      chan struct{}
+	doneAt    map[string]int64
 }
 
 func (p *Plugin) getConfig() configuration {

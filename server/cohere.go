@@ -46,6 +46,7 @@ func (p *Plugin) executeCohere(args *model.CommandArgs) *model.CommandResponse {
 		if _, appErr := p.API.UpdatePost(post); appErr != nil {
 			p.API.LogWarn("cohere post", "error", appErr.Error())
 		}
+		p.stepDone(args.ChannelId, "/cohere")
 	}()
 	return &model.CommandResponse{}
 }
