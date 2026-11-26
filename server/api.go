@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/mattermost/mattermost/server/public/model"
@@ -241,6 +242,7 @@ func (p *Plugin) handleMessage(body json.RawMessage) (any, error) {
 	}
 	p.ensureMember(in.ChannelID, p.botID)
 	post := &model.Post{UserId: p.botID, ChannelId: in.ChannelID, Message: in.Message, IsPinned: in.Pin}
+	p.embedAlert(post)
 	if in.Priority != "" || in.Ack || in.Persistent {
 		post.Metadata = &model.PostMetadata{Priority: &model.PostPriority{
 			Priority:                model.NewPointer(in.Priority),
@@ -253,6 +255,30 @@ func (p *Plugin) handleMessage(body json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("post message: %s", appErr.Message)
 	}
 	return map[string]string{"post_id": created.Id}, nil
+}
+
+var alertPermalinkRe = regexp.MustCompile(`\s*(https://\S+/pl/([a-z0-9]{26}))\s*$`)
+
+// embedAlert swaps a trailing permalink to one of this plugin's alerts for a copy of the alert's
+// card, since Mattermost only previews a permalink when the raw URL is in the message.
+func (p *Plugin) embedAlert(post *model.Post) {
+	m := alertPermalinkRe.FindStringSubmatch(post.Message)
+	if m == nil {
+		return
+	}
+	alert, appErr := p.API.GetPost(m[2])
+	if appErr != nil || alert.UserId != p.botID {
+		return
+	}
+	msg := post.Message[:len(post.Message)-len(m[0])]
+	link := "[Original alert](" + m[1] + ")"
+	if strings.Contains(msg, "Original alert") {
+		msg = strings.Replace(msg, "Original alert", link, 1)
+	} else {
+		msg += " " + link
+	}
+	post.Message = msg
+	post.AddProp(model.PostPropsAttachments, alert.Attachments())
 }
 
 func (p *Plugin) ensureMember(channelID, botID string) {
