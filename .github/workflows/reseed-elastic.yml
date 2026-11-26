@@ -3,6 +3,7 @@ name: Reseed Elastic demo data
 on:
   schedule:
     - cron: "47 6 * * *" # 00:47 facility time (UTC-6), so the incident is always "last night"; off the hour, when GitHub drops fewer scheduled runs
+    - cron: "47 8 * * *" # backup in case GitHub drops the first run
   workflow_dispatch:
     inputs:
       incident_date:
